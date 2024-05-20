@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # Input validation 
 if [ "$#" -ne 1 ]; then
     echo "Usage: $0 <input_file.tsv>"
@@ -29,7 +30,9 @@ check_tab_separator() {
 # Function to clean columns and remove rows with empty values in specified columns
 clean_columns() {
     temp=$(mktemp)
+    # Remove rows with empty values in specified columns
     awk -F'\t' -v col1="$3" -v col2="$4" 'NR == 1 || ($col1 != "" && $col2 != "")' "$1" > "$temp"
+    # Keep rows where the country appears at least three times
     awk -F'\t' -v col1="$3" -v col2="$4" 'NR==1 { print $col1 "\t" $col2; next } FNR==NR { count[$1]++; next } count[$1] >= 3 { print $col1 "\t" $col2 }' "$temp" "$temp" > "$2"
     rm "$temp"
 }
