@@ -42,3 +42,59 @@ clean_file() {
     clean_columns "$1" "$5" 7 8  # Life Expectancy vs. Cantril Ladder
 }
 
+# Function to calculate Pearson correlation and determine the best predictor
+calculate_result() {
+    max_corr=0
+    max_file=""
+
+    for file in "$@"; do
+        pearson_corr=$(awk -F'\t' '{
+            sum1+=$1; sum2+=$2; sum1sq+=$1*$1; sum2sq+=$2*$2; sum12+=$1*$2
+        } END {
+            if (NR < 3) {
+                print "Insufficient data for calculation"
+                exit 1
+            }
+            mean1=sum1/NR
+            mean2=sum2/NR
+            cov=sum12/NR-mean1*mean2
+            sd1=sqrt((sum1sq/NR)-mean1*mean1)
+            sd2=sqrt((sum2sq/NR)-mean2*mean2)
+            if (sd1 == 0 || sd2 == 0) {
+                print "Division by zero attempted"
+                exit 1
+            }
+            print cov/(sd1*sd2)
+        }' "$file")
+
+        awk -F'\t' 'NR==1 { print "Mean correlation of " $1 " with Cantril ladder is", '"$pearson_corr"'; exit }' "$file"
+
+        abs_corr=$(echo "$pearson_corr" | awk '{print ($1 < 0) ? -$1 : $1}')
+        if (( $(awk -v corr="$abs_corr" -v max_corr="$max_corr" 'BEGIN {print (corr > max_corr)}') )); then
+            max_corr="$pearson_corr"
+            max_file="$file"
+        fi
+    done
+    awk -F'\t' 'NR==1 { print "Most predictive mean correlation with the Cantril ladder is" $1 "(r =", '"$max_corr"' ")"; exit }' "$max_file"
+}
+
+# Main function
+main() {
+    clean_columns48=$(mktemp)  # Temporary file for GDP per capita vs. Cantril Ladder
+    clean_columns58=$(mktemp)  # Temporary file for Population vs. Cantril Ladder
+    clean_columns68=$(mktemp)  # Temporary file for Homicide Rate vs. Cantril Ladder
+    clean_columns78=$(mktemp)  # Temporary file for Life Expectancy vs. Cantril Ladder
+
+    check_file_exist "$1"
+    check_tab_separator "$1"
+    
+    clean_file "$1" "$clean_columns48" "$clean_columns58" "$clean_columns68" "$clean_columns78"
+  
+    calculate_result "$clean_columns48" "$clean_columns58" "$clean_columns68" "$clean_columns78"
+
+    rm "$clean_columns48" "$clean_columns58" "$clean_columns68" "$clean_columns78"
+}
+
+# Run the main function with the provided input file
+main "$1"
+
